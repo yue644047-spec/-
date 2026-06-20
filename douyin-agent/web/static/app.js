@@ -441,6 +441,338 @@ function clearMatchHistory() {
     showToast('匹配记录已清空', 'info');
 }
 
+// ====== 配置管理 ======
+let configSchema = null;       // 配置元数据
+let currentConfig = null;      // 当前配置值
+let originalConfig = null;     // 原始配置值 (用于比较)
+let currentConfigTab = 'env';  // 当前标签页
+let currentGroup = 'intent';   // 当前分组
+
+// 打开配置模态框
+async function openConfigModal() {
+    const modal = $('config-modal');
+    if (!modal) return;
+
+    modal.classList.add('active');
+
+    // 加载配置数据
+    try {
+        const [configRes, schemaRes] = await Promise.all([
+            fetch('/api/config').then(r => r.json()),
+            fetch('/api/config/schema').then(r => r.json()),
+        ]);
+
+        if (configRes.success && schemaRes.success) {
+            configSchema = schemaRes;
+            currentConfig = configRes.data;
+            originalConfig = JSON.parse(JSON.stringify(configRes.data)); // 深拷贝
+
+            renderConfigTabs();
+            renderGroupsNav();
+            renderConfigFields();
+
+            updateSecretsBadge();
+        } else {
+            showToast('加载配置失败', 'error');
+        }
+    } catch (e) {
+        console.error('[配置] 加载失败:', e);
+        showToast('加载配置失败: ' + e.message, 'error');
+    }
+}
+
+// 关闭配置模态框
+function closeConfigModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+
+    const modal = $('config-modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// 切换标签页 (公开/敏感)
+function switchConfigTab(tab) {
+    currentConfigTab = tab;
+
+    // 更新标签按钮状态
+    document.querySelectorAll('.config-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+
+    renderGroupsNav();
+    renderConfigFields();
+}
+
+// 渲染标签页
+function renderConfigTabs() {
+    // 标签已在HTML中定义，无需动态生成
+}
+
+// 渲染分组导航
+function renderGroupsNav() {
+    const navEl = $('config-groups-nav');
+    if (!navEl || !configSchema) return;
+
+    const groups = configSchema.groups || {};
+    const fields = configSchema[currentConfigTab] || {};
+
+    // 收集当前标签页使用的分组
+    let usedGroups = new Set();
+    Object.values(fields).forEach(field => {
+        if (field.group) usedGroups.add(field.group);
+    });
+
+    let html = '';
+    let isFirst = true;
+    for (const [groupId, groupInfo] of Object.entries(groups)) {
+        if (!usedGroups.has(groupId)) continue;
+
+        html += `<button class="group-btn ${isFirst ? 'active' : ''}" data-group="${groupId}" onclick="switchGroup('${groupId}')">
+            ${groupInfo.icon} ${groupInfo.name}
+        </button>`;
+        isFirst = false;
+    }
+
+    navEl.innerHTML = html || '<span style="color:var(--text-muted);font-size:12px;">无可用分组</span>';
+
+    // 默认选中第一个分组
+    if (usedGroups.size > 0) {
+        currentGroup = Array.from(usedGroups)[0];
+    }
+}
+
+// 切换分组
+function switchGroup(groupId) {
+    currentGroup = groupId;
+
+    document.querySelectorAll('.group-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.group === groupId);
+    });
+
+    renderConfigFields();
+}
+
+// 渲染配置字段
+function renderConfigFields() {
+    const container = $('config-fields-container');
+    if (!container || !configSchema || !currentConfig) return;
+
+    const fields = configSchema[currentConfigTab] || {};
+    const values = currentConfig[currentConfigTab] || {};
+
+    // 按分组过滤
+    let groupFields = [];
+    for (const [key, meta] of Object.entries(fields)) {
+        if (meta.group === currentGroup) {
+            groupFields.push({ key, ...meta, value: values[key] });
+        }
+    }
+
+    if (groupFields.length === 0) {
+        container.innerHTML = `<div class="loading-state">此分组暂无配置项</div>`;
+        return;
+    }
+
+    // 获取分组信息
+    const groups = configSchema.groups || {};
+    const groupInfo = groups[currentGroup] || { name: currentGroup };
+
+    let html = `<div class="config-group-section">`;
+    html += `<h3 class="config-group-title">${groupInfo.icon || ''} ${groupInfo.name}</h3>`;
+
+    for (const field of groupFields) {
+        html += renderSingleField(field);
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// 渲染单个配置字段
+function renderSingleField(field) {
+    const isPassword = field.type === 'password' || field.type === 'textarea';
+    const showPasswords = $('show-passwords')?.checked;
+    const inputType = (isPassword && !showPasswords) ? 'password' : field.type;
+
+    let inputHtml = '';
+    const value = field.value ?? '';
+
+    switch (field.type) {
+        case 'select':
+            inputHtml = `<select id="cfg-${field.key}" data-key="${field.key}">
+                ${(field.options || []).map(opt =>
+                    `<option value="${opt.value}" ${value === opt.value ? 'selected' : ''}>${opt.label}</option>`
+                ).join('')}
+            </select>`;
+            break;
+
+        case 'textarea':
+            inputHtml = `<textarea id="cfg-${field.key}" data-key="${field.key}" placeholder="${field.placeholder || ''}">${escapeHtml(value)}</textarea>`;
+            break;
+
+        case 'number':
+            inputHtml = `<input type="number" id="cfg-${field.key}" data-key="${field.key}"
+                value="${value}" min="${field.min || ''}" max="${field.max || ''}" step="${field.step || 'any'}"
+                placeholder="${field.placeholder || ''}">`;
+            break;
+
+        case 'password':
+        default:
+            inputHtml = `<input type="${inputType}" id="cfg-${field.key}" data-key="${field.key}"
+                value="${value}" placeholder="${field.placeholder || ''}">`;
+    }
+
+    return `
+        <div class="config-field" data-field="${field.key}">
+            <label>${field.label}</label>
+            <div style="position:relative;">
+                ${inputHtml}
+                ${field.description ? `<div class="field-desc">${field.description}</div>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// 更新敏感配置徽章状态
+function updateSecretsBadge() {
+    const badge = document.querySelector('.secrets-badge');
+    if (!badge || !currentConfig) return;
+
+    const secrets = currentConfig.secrets || {};
+    const hasContent = Object.values(secrets).some(v => v && v !== '' && v !== '***');
+
+    badge.textContent = hasContent ? '已配置' : '未设置';
+    badge.classList.toggle('set', hasContent);
+}
+
+// 监听显示密码复选框
+document.addEventListener('DOMContentLoaded', () => {
+    const cb = $('show-passwords');
+    if (cb) {
+        cb.addEventListener('change', () => {
+            renderConfigFields(); // 重新渲染以更新密码可见性
+        });
+    }
+});
+
+// 保存完整配置
+async function saveFullConfig() {
+    const btn = $('btn-save-config');
+    if (!btn) return;
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '&#9203; 保存中...';
+
+        // 收集表单数据
+        const envData = {};
+        const secretsData = {};
+
+        document.querySelectorAll('#config-form .config-field').forEach(el => {
+            const key = el.dataset.field;
+            const input = el.querySelector('input, select, textarea');
+            if (!key || !input) return;
+
+            const value = input.value.trim();
+
+            // 根据当前标签页分类
+            if (currentConfigTab === 'env') {
+                envData[key] = value;
+            } else {
+                secretsData[key] = value;
+            }
+        });
+
+        // 构建请求数据
+        const payload = {};
+        if (Object.keys(envData).length > 0) payload.env = envData;
+        if (Object.keys(secretsData).length > 0) payload.secrets = secretsData;
+
+        console.log('[配置] 保存数据:', payload);
+
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('配置已保存成功!', 'success');
+
+            // 更新本地缓存
+            if (payload.env) {
+                currentConfig.env = { ...currentConfig.env, ...payload.env };
+            }
+            if (payload.secrets) {
+                currentConfig.secrets = { ...currentConfig.secrets, ...payload.secrets };
+            }
+            originalConfig = JSON.parse(JSON.stringify(currentConfig));
+
+            // 同步快速配置面板
+            syncQuickConfigPanel();
+
+            // 2秒后关闭模态框
+            setTimeout(() => closeConfigModal(), 1500);
+        } else {
+            showToast('保存失败: ' + result.message, 'error');
+        }
+    } catch (e) {
+        console.error('[配置] 保存错误:', e);
+        showToast('保存失败: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '&#128190; 保存配置';
+    }
+}
+
+// 同步快速配置面板的值
+function syncQuickConfigPanel() {
+    if (!currentConfig?.env) return;
+
+    const intervalEl = $('cfg-interval');
+    const ocrEl = $('cfg-ocr-threshold');
+
+    if (intervalEl && currentConfig.env.CAPTURE_INTERVAL) {
+        intervalEl.value = currentConfig.env.CAPTURE_INTERVAL;
+    }
+    if (ocrEl && currentConfig.env.OCR_CONFIDENCE_THRESHOLD) {
+        ocrEl.value = currentConfig.env.OCR_CONFIDENCE_THRESHOLD;
+    }
+}
+
+// 快速保存 (参数配置区域)
+async function saveQuickConfig() {
+    const intervalEl = $('cfg-interval');
+    const ocrEl = $('cfg-ocr-threshold');
+
+    if (!intervalEl || !ocrEl) return;
+
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                env: {
+                    CAPTURE_INTERVAL: intervalEl.value,
+                    OCR_CONFIDENCE_THRESHOLD: ocrEl.value,
+                }
+            }),
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('配置已保存', 'success');
+        } else {
+            showToast('保存失败: ' + result.message, 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
 // ====== 意图识别模式 ======
 function setMode(mode) {
     currentMode = mode;

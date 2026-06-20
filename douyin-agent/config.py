@@ -1,12 +1,33 @@
 """
 配置管理模块
-从 .env 文件加载所有配置项，提供统一的配置访问接口
+从 .env 和 secrets.env 文件加载所有配置项，提供统一的配置访问接口
+
+文件加载顺序 (后加载的优先级更高):
+  1. .env          - 公开配置 (非敏感)
+  2. secrets.env   - 敏感配置 (API Key, Token等)
 """
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# 加载 .env 文件
-load_dotenv()
+# 项目根目录
+PROJECT_ROOT = Path(__file__).parent
+
+# ====== 加载环境变量文件 ======
+# 优先加载 secrets.env (敏感信息), 其次加载 .env (普通配置)
+# 后加载的会覆盖先加载的同名变量
+ENV_FILE = PROJECT_ROOT / ".env"
+SECRETS_FILE = PROJECT_ROOT / "secrets.env"
+
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE, override=False)
+
+if SECRETS_FILE.exists():
+    load_dotenv(SECRETS_FILE, override=True)  # secrets 优先级更高
+else:
+    print(f"⚠️ 警告: 未找到 {SECRETS_FILE} 文件")
+    print("   首次使用请创建该文件并填入敏感配置 (API Key等)")
+    print("   参考: secrets.env.example")
 
 
 class Config:
@@ -84,13 +105,29 @@ class Config:
         errors = []
         if not cls.ROOM_ID or cls.ROOM_ID == "你的目标直播间ID":
             errors.append("ROOM_ID 未配置，请在 .env 中填写直播间ID")
-        if not cls.DOUYIN_COOKIE or cls.DOUYIN_COOKIE == "你的www.douyin.com Cookie":
-            errors.append("DOUYIN_COOKIE 未配置")
-        if not cls.LIVE_COOKIE or cls.LIVE_COOKIE == "你的live.douyin.com Cookie":
-            errors.append("LIVE_COOKIE 未配置")
         if cls.INTENT_MODE == "llm" and not cls.LLM_API_KEY:
-            errors.append("LLM模式需要配置 LLM_API_KEY")
+            errors.append("LLM模式需要配置 LLM_API_KEY (请在 secrets.env 中设置)")
         return errors
+
+    @classmethod
+    def check_secrets(cls):
+        """检查敏感配置文件是否存在"""
+        if not SECRETS_FILE.exists():
+            return False, f"未找到 {SECRETS_FILE.name} 文件"
+        return True, "OK"
+
+    @classmethod
+    def get_config_status(cls):
+        """获取完整配置状态信息"""
+        status = {
+            "secrets_file_exists": SECRETS_FILE.exists(),
+            "env_file_exists": ENV_FILE.exists(),
+            "llm_api_key_set": bool(cls.LLM_API_KEY),
+            "douyin_cookie_set": bool(cls.DOUYIN_COOKIE),
+            "live_cookie_set": bool(cls.LIVE_COOKIE),
+            "intent_mode": cls.INTENT_MODE,
+        }
+        return status
 
 
 # 全局配置实例

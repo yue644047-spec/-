@@ -61,6 +61,26 @@ body {
     color: var(--text-secondary);
 }
 
+.topbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    background: rgba(139,92,246,.1);
+    border: 1px solid rgba(139,92,246,.3);
+    border-radius: var(--radius-sm);
+    color: #a78bfa;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all .2s;
+}
+.topbar-btn:hover {
+    background: rgba(139,92,246,.2);
+    border-color: #8b5cf6;
+    color: #c4b5fd;
+}
+
 .status-dot {
     width: 10px;
     height: 10px;
@@ -795,4 +815,237 @@ body {
     .main-layout { grid-template-columns: 1fr; }
     .left-panel { order: 2; }
     .right-panel { order: 1; min-height: 400px; }
+}
+
+/* ====== 配置管理模态框 ====== */
+.config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.config-header .card-title {
+    margin-bottom: 0;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn .2s ease;
+}
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.modal-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* 标签页 */
+.config-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 12px 20px 0;
+    border-bottom: 2px solid var(--border);
+}
+.config-tab {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: all .2s;
+    position: relative;
+}
+.config-tab:hover {
+    color: var(--text-primary);
+    background: rgba(139,92,246,.08);
+}
+.config-tab.active {
+    color: var(--primary);
+    background: rgba(139,92,246,.12);
+}
+.tab-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    background: var(--danger);
+    color: white;
+    border-radius: 10px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+.secrets-badge.set {
+    background: var(--success);
+}
+
+/* 分组导航 */
+.config-groups-nav {
+    display: flex;
+    gap: 6px;
+    padding: 10px 20px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.group-btn {
+    padding: 5px 12px;
+    background: var(--bg-input);
+    border: 1px solid transparent;
+    border-radius: 20px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+}
+.group-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.group-btn.active {
+    background: var(--primary-bg);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* 配置表单区域 */
+.config-form-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+}
+.config-group-section {
+    margin-bottom: 24px;
+}
+.config-group-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+.config-field {
+    margin-bottom: 14px;
+}
+.config-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+.config-field input[type="text"],
+.config-field input[type="number"],
+.config-field input[type="password"],
+.config-field select,
+.config-field textarea {
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    transition: border-color .2s;
+    box-sizing: border-box;
+}
+.config-field input:focus,
+.config-field select:focus,
+.config-field textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(139,92,246,.15);
+}
+.config-field textarea {
+    min-height: 80px;
+    resize: vertical;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+}
+.config-field .field-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+/* 模态框底部 */
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,.15);
+}
+.footer-right {
+    display: flex;
+    gap: 8px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.checkbox-label input[type="checkbox"] {
+    accent-color: var(--primary);
+}
+
+/* 加载状态 */
+.loading-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* 已修改标记 */
+.field-modified {
+    border-color: var(--warning) !important;
+}
+.field-modified::after {
+    content: "已修改";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px;
+    color: var(--warning);
+    background: rgba(245,158,11,.15);
+    padding: 1px 5px;
+    border-radius: 3px;
 }

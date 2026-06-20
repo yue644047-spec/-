@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置管理 - 抖音陪玩Agent</title>
+    <link rel="stylesheet" href="/static/style.css?v=11">
+    <link rel="stylesheet" href="/static/config.css?v=1">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="config-topbar">
+        <div class="topbar-left">
+            <a href="/" class="back-link">&#8592; 返回主页</a>
+            <h1 class="topbar-title">&#9881; 配置管理中心</h1>
+        </div>
+        <div class="topbar-right">
+            <span class="status-indicator" id="config-status">
+                <span class="status-dot" id="status-dot-config"></span>
+                <span id="status-text-config">加载中...</span>
+            </span>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="config-layout">
+
+        <!-- 左侧: 配置文件状态 -->
+        <aside class="config-sidebar">
+            <!-- 文件状态卡片 -->
+            <div class="card file-status-card">
+                <h3 class="card-subtitle">&#128196; 配置文件状态</h3>
+                <div class="file-list" id="file-status-list">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 快速操作 -->
+            <div class="card quick-actions-card">
+                <h3 class="card-subtitle">&#9889; 快速操作</h3>
+                <div class="action-buttons-vertical">
+                    <button class="btn btn-outline btn-block" onclick="reloadConfig()">
+                        &#128260; 重新加载
+                    </button>
+                    <button class="btn btn-outline btn-block" onclick="exportConfig()">
+                        &#128229; 导出配置
+                    </button>
+                    <button class="btn btn-outline btn-block" onclick="showImportDialog()">
+                        &#128194; 导入配置
+                    </button>
+                    <button class="btn btn-danger-outline btn-block" onclick="resetToDefault()">
+                        &#8634; 恢复默认
+                    </button>
+                </div>
+            </div>
+
+            <!-- 配置说明 -->
+            <div class="card info-card">
+                <h3 class="card-subtitle">&#8505; 使用提示</h3>
+                <ul class="info-list">
+                    <li>修改后需点击保存才生效</li>
+                    <li>敏感信息已脱敏显示</li>
+                    <li>勾选"显示密码"可查看明文</li>
+                    <li>运行中的服务需重启生效</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- 右侧: 配置编辑器 -->
+        <section class="config-editor">
+            <!-- 标签页导航 -->
+            <div class="config-tabs-bar">
+                <button class="tab-btn active" data-tab="env" onclick="switchTab('env')">
+                    <span class="tab-icon">&#128196;</span>
+                    <span class="tab-text">公开配置</span>
+                    <span class="tab-count" id="count-env">0项</span>
+                </button>
+                <button class="tab-btn" data-tab="secrets" onclick="switchTab('secrets')">
+                    <span class="tab-icon">&#128274;</span>
+                    <span class="tab-text">敏感配置</span>
+                    <span class="tab-count tab-count-danger" id="count-secrets">0项</span>
+                </button>
+            </div>
+
+            <!-- 工具栏 -->
+            <div class="editor-toolbar">
+                <div class="toolbar-left">
+                    <label class="checkbox-label toolbar-item">
+                        <input type="checkbox" id="show-passwords-toggle">
+                        显示密码/密钥
+                    </label>
+                    <label class="checkbox-label toolbar-item">
+                        <input type="checkbox" id="show-modified-only">
+                        仅显示已修改
+                    </label>
+                </div>
+                <div class="toolbar-right">
+                    <span class="modified-count" id="modified-counter">0 项已修改</span>
+                    <button class="btn btn-primary btn-sm" onclick="saveAllConfig()" id="btn-save-all">
+                        &#128190; 保存所有更改
+                    </button>
+                </div>
+            </div>
+
+            <!-- 分组标签 -->
+            <div class="groups-tabs" id="groups-tabs-container">
+                <!-- 动态生成分组按钮 -->
+            </div>
+
+            <!-- 配置表单区域 -->
+            <div class="config-form-area" id="config-form-area">
+                <form id="config-editor-form" onsubmit="return false;">
+                    <div id="fields-container" class="fields-grid">
+                        <div class="loading-placeholder">
+                            <div class="spinner"></div>
+                            <p>正在加载配置...</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 底部状态栏 -->
+            <div class="editor-statusbar">
+                <div class="status-left">
+                    <span id="last-saved-time">未保存</span>
+                </div>
+                <div class="status-right">
+                    <span id="field-focus-info"></span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast容器 -->
+    <div id="toast-container"></div>
+
+    <!-- 导入对话框 -->
+    <div class="modal-overlay" id="import-modal" onclick="closeImportModal(event)">
+        <div class="modal-content modal-sm" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>&#128194; 导入配置</h2>
+                <button class="btn btn-icon" onclick="closeImportModal()">&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <p class="import-hint">选择要导入的配置类型:</p>
+                <div class="import-options">
+                    <label class="import-option">
+                        <input type="radio" name="import-type" value="env" checked>
+                        <span>&#128196; 公开配置 (.env)</span>
+                    </label>
+                    <label class="import-option">
+                        <input type="radio" name="import-type" value="secrets">
+                        <span>&#128274; 敏感配置 (secrets.env)</span>
+                    </label>
+                    <label class="import-option">
+                        <input type="radio" name="import-type" value="all">
+                        <span>&#128451; 全部配置</span>
+                    </label>
+                </div>
+                <div class="file-upload-area" id="upload-area">
+                    <input type="file" id="import-file-input" accept=".env,.json,.txt" onchange="handleFileSelect(event)">
+                    <div class="upload-icon">&#128194;</div>
+                    <p>点击或拖拽文件到此处</p>
+                    <p class="upload-hint">支持 .env, .json, .txt 格式</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeImportModal()">取消</button>
+                <button class="btn btn-primary" onclick="executeImport()" id="btn-do-import" disabled>
+                    &#128190; 导入
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/config.js?v=1"></script>
+</body>
+</html>
