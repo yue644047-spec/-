@@ -914,9 +914,9 @@ gunicorn -w 4 -b 0.0.0.0:5001 web.server:app
 
 ## 📞 联系方式
 
-- **问题反馈**: 请提交 [GitHub Issues](../../issues)
-- **功能建议**: 欢迎 Discussion 讨论
-- **商业合作**: 请发送邮件至 your-email@example.com
+- **问题反馈**: 请发送邮件至 yue644047@gmail
+- **功能建议**: 请发送邮件至 yue644047@gmail
+- **商业合作**: 请发送邮件至 yue644047@gmail
 
 ---
 
